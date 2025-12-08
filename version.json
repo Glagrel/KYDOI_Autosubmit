@@ -1,5 +1,5 @@
 {
-  "version": "14.0",
-  "download_url": "https://github.com/Glagrel/KYDOI_Autosubmit/releases/download/v14.0/KY_DOI_Installer.exe",
-  "notes": "Added NPI auto-fill support (v14)."
+  "version": "15.0",
+  "download_url": "https://github.com/Glagrel/KYDOI_Autosubmit/releases/download/v15.0/KY_DOI_Installer.exe",
+  "notes": "v15: Adds GitHub-based auto-updater and NPI support."
 }
