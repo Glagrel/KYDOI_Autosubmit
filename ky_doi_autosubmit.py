@@ -1,8 +1,14 @@
 # ===============================================================
-#  KY DOI PBM Complaint Auto-Submitter — SCRIPT v18.2
+#  KY DOI PBM Complaint Auto-Submitter — SCRIPT v18.3
 #  Windows 11
 #
-#  CHANGES IN v18.2:
+#  CHANGES IN v18.3:
+#    • FIX: Submission detection no longer relies on URL change.
+#      PBM_Success.aspx stays at the same URL after Submit is clicked,
+#      so fill_step7 now watches for the form POST to insurance.ky.gov
+#      instead. Closing browser before submitting still archives as FAIL.
+#
+#  CHANGES IN v18.2 (still present):
 #    • FEATURE: When HEADLESS_MODE is on (and TESTING_MODE is off),
 #      steps 0-6 now run invisibly. Browser switches to visible only
 #      for the reCAPTCHA/signature step so operator can complete it.
@@ -15,7 +21,7 @@
 #    • FIX: fill_step7 (signature/submit page) always pauses for
 #      human to solve Google reCAPTCHA v2 and click Submit Complaint
 #    • Browser is forced visible for final step even in HEADLESS_MODE
-#    • Browser is left open until operator submits (URL change detected)
+#    • Browser is left open until operator submits (POST to KY DOI detected)
 #    • Removed auto-click of Submit — reCAPTCHA requires human interaction
 #
 #  CHANGES IN v16 (still present):
@@ -54,7 +60,7 @@ import requests, urllib.request, os, sys, subprocess, ctypes
 # VERSION / UPDATER CONFIG
 # ---------------------------------------------------------------
 VERSION_URL = "https://raw.githubusercontent.com/Glagrel/KYDOI_Autosubmit/main/version.json"
-CURRENT_VERSION = "18.2"
+CURRENT_VERSION = "18.3"
 INSTALLER_NAME = "KY_DOI_Installer.exe"
 
 
@@ -480,7 +486,8 @@ def fill_step7(page, p):
       1. Fills the signature field automatically.
       2. Pauses and instructs the operator to solve the reCAPTCHA and click
          Submit Complaint themselves.
-      3. Waits (no timeout) for the URL to change as confirmation.
+      3. Waits (no timeout) for a POST to insurance.ky.gov as confirmation.
+         (The URL does not change after submission, so URL-watching fails here.)
     """
     wait_page_ready(page)
     signature = f"{p['complainant_first']} {p['complainant_last']}"
@@ -492,12 +499,21 @@ def fill_step7(page, p):
     print("[ACTION REQUIRED] then click 'Submit Complaint'.")
     print("==============================\n")
 
-    old = page.url
+    # The page stays on PBM_Success.aspx after submit (URL never changes).
+    # Detect submission by watching for the form POST to insurance.ky.gov.
+    # reCAPTCHA verification POSTs go to google.com, so filtering by domain
+    # ensures we only fire on the actual form submission.
+    # If the operator closes the browser without submitting, Playwright raises
+    # a TargetClosedError which propagates up and is caught as FAIL.
+    page.wait_for_event(
+        "request",
+        predicate=lambda r: r.method == "POST" and "insurance.ky.gov" in r.url,
+        timeout=0,
+    )
     try:
-        page.wait_for_url(lambda u: u != old, timeout=0)
+        page.wait_for_load_state("networkidle", timeout=15000)
     except PlaywrightTimeoutError:
-        return
-    wait_page_ready(page)
+        pass  # POST was sent; networkidle stall is non-fatal
     log("Complaint submitted successfully.")
 
 
