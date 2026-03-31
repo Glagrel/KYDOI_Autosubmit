@@ -1,5 +1,5 @@
-{
-  "version": "17.0",
-  "download_url": "https://github.com/Glagrel/KYDOI_Autosubmit/releases/download/v17.0/KY_DOI_Installer.exe",
-  "notes": "Attestation page + reCAPTCHA handling"
+﻿{
+    "version":  "18.0",
+    "download_url":  "https://github.com/Glagrel/KYDOI_Autosubmit/releases/download/v18.0/KY_DOI_Installer.exe",
+    "notes":  "Release v18.0"
 }
