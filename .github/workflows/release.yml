@@ -57,7 +57,7 @@ jobs:
           $nsis_path = "C:\Program Files (x86)\NSIS\makensis.exe"
           & $nsis_path installer.nsi
           if (-not (Test-Path "KY_DOI_Installer.exe")) {
-            throw "NSIS build failed — KY_DOI_Installer.exe not found"
+            throw "NSIS build failed - KY_DOI_Installer.exe not found"
           }
           Write-Host "Build succeeded"
         shell: powershell
