@@ -74,7 +74,8 @@ def check_for_update(auto_popup=True):
     try:
         r = requests.get(VERSION_URL, timeout=5)
         r.raise_for_status()
-        info = r.json()
+        # Handle potential UTF-8 BOM in JSON response
+        info = json.loads(r.text.encode('utf-8').decode('utf-8-sig'))
         latest = info.get("version")
         url = info.get("download_url")
         notes = info.get("notes", "")

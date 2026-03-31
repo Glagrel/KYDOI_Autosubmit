@@ -85,7 +85,8 @@ jobs:
               download_url = $DOWNLOAD_URL
               notes        = "Release v$VERSION"
           }
-          $versionJson | ConvertTo-Json | Set-Content version.json -Encoding UTF8
+          $json = $versionJson | ConvertTo-Json
+          [System.IO.File]::WriteAllText("version.json", $json, [System.Text.Encoding]::UTF8)
           Get-Content version.json
         shell: powershell
 
