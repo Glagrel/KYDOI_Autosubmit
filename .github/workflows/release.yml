@@ -22,15 +22,15 @@ jobs:
       - name: Extract version from script
         id: get-version
         run: |
-          VERSION=$(grep -oP 'CURRENT_VERSION = "\K[^"]+' ky_doi_autosubmit.py)
+          VERSION=$(sed -n 's/.*CURRENT_VERSION = "\([^"]*\)".*/\1/p' ky_doi_autosubmit.py)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Found version: $VERSION"
 
       - name: Check if version changed
         id: check-version
         run: |
-          SCRIPT_VERSION=$(grep -oP 'CURRENT_VERSION = "\K[^"]+' ky_doi_autosubmit.py)
-          JSON_VERSION=$(grep -oP '"version": "\K[^"]+' version.json)
+          SCRIPT_VERSION=$(sed -n 's/.*CURRENT_VERSION = "\([^"]*\)".*/\1/p' ky_doi_autosubmit.py)
+          JSON_VERSION=$(sed -n 's/.*"version": "\([^"]*\)".*/\1/p' version.json)
           if [ "$SCRIPT_VERSION" != "$JSON_VERSION" ]; then
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "Version changed from $JSON_VERSION to $SCRIPT_VERSION"
