@@ -1,8 +1,17 @@
 # ===============================================================
-#  KY DOI PBM Complaint Auto-Submitter — SCRIPT v18.3
+#  KY DOI PBM Complaint Auto-Submitter — SCRIPT v18.4
 #  Windows 11
 #
-#  CHANGES IN v18.3:
+#  CHANGES IN v18.4:
+#    • FIX: Auto-updater now reads CURRENT_VERSION directly from the live
+#      script on GitHub instead of version.json — no local file needed.
+#    • Changelog notes for the new version are extracted from the script
+#      header and shown in the update popup automatically.
+#    • Version comparison is now numeric (18.10 > 18.9), not string-based.
+#    • Backwards compatible: v15–v18.3 installs still reach this build
+#      via version.json (kept updated by CI).
+#
+#  CHANGES IN v18.3 (still present):
 #    • FIX: Submission detection no longer relies on URL change.
 #      PBM_Success.aspx stays at the same URL after Submit is clicked,
 #      so fill_step7 now watches for the form POST to insurance.ky.gov
@@ -59,9 +68,19 @@ import requests, urllib.request, os, sys, subprocess, ctypes
 # ---------------------------------------------------------------
 # VERSION / UPDATER CONFIG
 # ---------------------------------------------------------------
-VERSION_URL = "https://raw.githubusercontent.com/Glagrel/KYDOI_Autosubmit/main/version.json"
-CURRENT_VERSION = "18.3"
+# Source of truth for latest version: the live script on GitHub.
+# version.json is still updated by CI so v15–v18.3 users can reach this build.
+SCRIPT_RAW_URL = "https://raw.githubusercontent.com/Glagrel/KYDOI_Autosubmit/main/ky_doi_autosubmit.py"
+CURRENT_VERSION = "18.4"
 INSTALLER_NAME = "KY_DOI_Installer.exe"
+
+
+def _parse_version(s):
+    """Convert '18.4' → (18, 4) for numeric comparison."""
+    try:
+        return tuple(int(x) for x in s.split("."))
+    except Exception:
+        return (0,)
 
 
 def popup_yes_no(title, text):
@@ -71,35 +90,65 @@ def popup_yes_no(title, text):
 
 def check_for_update(auto_popup=True):
     """
-    Checks GitHub version.json for a newer version.
-    If found and auto_popup=True, shows native Yes/No dialog:
-      • YES → downloads installer to %TEMP%, runs it, exits script
-      • NO  → continues without updating
-    If auto_popup=False, returns True/False whether update exists.
+    Fetches the live ky_doi_autosubmit.py from GitHub and reads CURRENT_VERSION
+    directly from its source — no separate version.json required.
+
+    If the remote version is newer:
+      auto_popup=True  → native Yes/No dialog; YES downloads + runs installer
+      auto_popup=False → returns True (update available) or False (up to date)
+
+    Backwards compatible: v15–v18.3 users still reach this build via version.json
+    (updated by CI). Once on v18.4+, this mechanism takes over.
     """
     try:
-        r = requests.get(VERSION_URL, timeout=5)
+        r = requests.get(SCRIPT_RAW_URL, timeout=10)
         r.raise_for_status()
-        # Handle potential UTF-8 BOM in JSON response
-        info = json.loads(r.text.encode('utf-8').decode('utf-8-sig'))
-        latest = info.get("version")
-        url = info.get("download_url")
-        notes = info.get("notes", "")
+        text = r.text
 
-        if latest and url and latest != CURRENT_VERSION:
-            if auto_popup:
-                msg = f"New version available: {latest}\n\n{notes}\n\nDownload and install now?"
-                title = "KY DOI PBM Auto Submitter — Update Available"
-                if popup_yes_no(title, msg):
-                    dest = os.path.join(os.getenv("TEMP", "."), INSTALLER_NAME)
-                    try:
-                        urllib.request.urlretrieve(url, dest)
-                        subprocess.Popen([dest])
-                        sys.exit(0)
-                    except Exception as e:
-                        print(f"Update download/launch failed: {e}")
-            else:
-                return True
+        # Parse version from the script constant
+        m = re.search(r'^CURRENT_VERSION\s*=\s*"([^"]+)"', text, re.MULTILINE)
+        if not m:
+            return False
+        latest = m.group(1)
+
+        if _parse_version(latest) <= _parse_version(CURRENT_VERSION):
+            return False
+
+        # Extract changelog notes for the new version from the comment header
+        notes = ""
+        m2 = re.search(
+            r'#\s+CHANGES IN v' + re.escape(latest) + r'[^\n]*\n'
+            r'((?:#(?!\s+CHANGES IN v|\s*=)[^\n]*\n)*)',
+            text,
+        )
+        if m2:
+            raw_lines = m2.group(1).splitlines()
+            clean = [re.sub(r'^#\s*', '', ln).strip() for ln in raw_lines]
+            notes = '\n'.join(ln for ln in clean if ln)
+
+        url = (
+            f"https://github.com/Glagrel/KYDOI_Autosubmit/releases/download/"
+            f"v{latest}/{INSTALLER_NAME}"
+        )
+
+        if auto_popup:
+            note_block = f"\n\nWhat's new:\n{notes}" if notes else ""
+            msg = (
+                f"Version {latest} is available  (you have {CURRENT_VERSION})."
+                f"{note_block}\n\nDownload and install now?"
+            )
+            title = "KY DOI PBM Auto Submitter — Update Available"
+            if popup_yes_no(title, msg):
+                dest = os.path.join(os.getenv("TEMP", "."), INSTALLER_NAME)
+                try:
+                    urllib.request.urlretrieve(url, dest)
+                    subprocess.Popen([dest])
+                    sys.exit(0)
+                except Exception as e:
+                    print(f"Update download/launch failed: {e}")
+        else:
+            return True
+
     except Exception as e:
         print(f"Update check failed: {e}")
     return False
