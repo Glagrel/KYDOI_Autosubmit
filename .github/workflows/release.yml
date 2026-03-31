@@ -43,6 +43,8 @@ jobs:
     needs: check-version
     if: needs.check-version.outputs.version-changed == 'true'
     runs-on: windows-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
