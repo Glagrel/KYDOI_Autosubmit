@@ -502,14 +502,15 @@ def submit_claim_with_playwright(parsed: dict):
         f"(Pharmacy: {parsed.get('pharmacy_name', '')}, NPI: {parsed.get('npi', '')})"
     )
 
+    # When HEADLESS_MODE is on and not in testing mode, fill steps 0-6 invisibly
+    # then switch to a visible browser only for the reCAPTCHA step.
+    # Testing mode always uses a visible browser so the operator can click NEXT.
+    use_headless_phase = HEADLESS_MODE and not TESTING_MODE
+
     with sync_playwright() as pw:
-        # The final submission page contains a Google reCAPTCHA v2 that requires
-        # a human click, so the browser must always be visible for the operator.
-        # HEADLESS_MODE is intentionally ignored here.
-        if HEADLESS_MODE:
-            log("NOTE: HEADLESS_MODE overridden — browser must be visible for reCAPTCHA.")
-        browser = pw.chromium.launch(headless=False)
-        page = browser.new_page()
+        browser = pw.chromium.launch(headless=use_headless_phase)
+        context = browser.new_context()
+        page = context.new_page()
 
         if TESTING_MODE:
             page.set_default_timeout(0)
@@ -540,6 +541,20 @@ def submit_claim_with_playwright(parsed: dict):
 
         fill_step6(page, parsed)
         wait_for_manual_next(page)
+
+        if use_headless_phase:
+            # Capture the session cookies and the URL of the captcha page,
+            # then reopen a visible browser so the operator can solve reCAPTCHA.
+            captcha_url = page.url
+            storage = context.storage_state()
+            browser.close()
+
+            log("Headless phase complete — opening visible browser for reCAPTCHA step.")
+            browser = pw.chromium.launch(headless=False)
+            context = browser.new_context(storage_state=storage)
+            page = context.new_page()
+            page.goto(captcha_url)
+            page.wait_for_load_state("networkidle")
 
         fill_step7(page, parsed)
         browser.close()
