@@ -3,7 +3,7 @@
 ; ---------------------------------------------------------------
 ; VERSION — keep in sync with CURRENT_VERSION in ky_doi_autosubmit.py
 ; ---------------------------------------------------------------
-!define VERSION "17.0"
+!define VERSION "18.0"
 !define PRODUCT_NAME "KY DOI PBM Auto Submitter"
 
 Name "${PRODUCT_NAME} v${VERSION}"

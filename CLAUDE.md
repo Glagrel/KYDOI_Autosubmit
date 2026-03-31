@@ -4,7 +4,7 @@
 
 Windows 11 automation tool that fills and submits Kentucky Department of Insurance (KY DOI) PBM complaint forms using Playwright (Chromium). Claims are sourced from PDF reports exported by PioneerRx pharmacy software or from CSV files dropped into a watched folder.
 
-**Current script version:** `CURRENT_VERSION = "17.0"` in `ky_doi_autosubmit.py`
+**Current script version:** `CURRENT_VERSION = "18.0"` in `ky_doi_autosubmit.py`
 
 ---
 
