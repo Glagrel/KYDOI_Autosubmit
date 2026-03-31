@@ -1,8 +1,21 @@
 # ===============================================================
-#  KY DOI PBM Complaint Auto-Submitter — SCRIPT v15
+#  KY DOI PBM Complaint Auto-Submitter — SCRIPT v17
 #  Windows 11
 #
-#  CHANGES IN v15:
+#  CHANGES IN v17:
+#    • FIX: fill_step7 (signature/submit page) always pauses for
+#      human to solve Google reCAPTCHA v2 and click Submit Complaint
+#    • Browser is forced visible for final step even in HEADLESS_MODE
+#    • Browser is left open until operator submits (URL change detected)
+#    • Removed auto-click of Submit — reCAPTCHA requires human interaction
+#
+#  CHANGES IN v16 (still present):
+#    • ADDED: Attestation page handling (PBM_Attestation.aspx)
+#    • Checks #MainContent_chkAttestation checkbox
+#    • Clicks #MainContent_btnNext (or waits in TESTING_MODE)
+#    • Inserted between fill_step1 and fill_step2 in form flow
+#
+#  CHANGES IN v15 (still present):
 #    • ADDED: GitHub auto-updater with native Windows popup
 #    • Uses version.json in GitHub repo to detect new version
 #    • On startup (non-testing only), prompts to download + run
@@ -32,7 +45,7 @@ import requests, urllib.request, os, sys, subprocess, ctypes
 # VERSION / UPDATER CONFIG
 # ---------------------------------------------------------------
 VERSION_URL = "https://raw.githubusercontent.com/Glagrel/KYDOI_Autosubmit/main/version.json"
-CURRENT_VERSION = "15.0"
+CURRENT_VERSION = "17.0"
 INSTALLER_NAME = "KY_DOI_Installer.exe"
 
 
@@ -375,6 +388,18 @@ def fill_step1(page, p):
         page.wait_for_timeout(600)
 
 
+def fill_attestation(page):
+    """
+    Handles the PBM_Attestation.aspx page that appears after complainant info.
+    Checks the attestation checkbox then clicks Next (or waits in TESTING_MODE).
+    """
+    wait_page_ready(page)
+    page.check("#MainContent_chkAttestation")
+    if not TESTING_MODE:
+        page.click("#MainContent_btnNext")
+        page.wait_for_timeout(600)
+
+
 def fill_step2(page, p):
     wait_page_ready(page)
     page.fill("#txtinsName", p["insurance_company"])
@@ -437,24 +462,33 @@ def fill_step6(page, p):
 
 
 def fill_step7(page, p):
+    """
+    Signature + reCAPTCHA + Submit page (PBM_Success.aspx).
+
+    The final page contains a Google reCAPTCHA v2 checkbox that requires a
+    human click.  Regardless of TESTING_MODE, this step always:
+      1. Fills the signature field automatically.
+      2. Pauses and instructs the operator to solve the reCAPTCHA and click
+         Submit Complaint themselves.
+      3. Waits (no timeout) for the URL to change as confirmation.
+    """
     wait_page_ready(page)
     signature = f"{p['complainant_first']} {p['complainant_last']}"
     page.fill("#txtSignature", signature)
 
-    if TESTING_MODE:
-        print("\n==============================")
-        print("[TESTING MODE] Signature entered. Click SUBMIT manually.")
-        print("==============================\n")
-        old = page.url
-        try:
-            page.wait_for_url(lambda u: u != old, timeout=0)
-        except PlaywrightTimeoutError:
-            return
-        wait_page_ready(page)
-        return
+    print("\n==============================")
+    print("[ACTION REQUIRED] Signature entered.")
+    print("[ACTION REQUIRED] Please solve the reCAPTCHA in the browser,")
+    print("[ACTION REQUIRED] then click 'Submit Complaint'.")
+    print("==============================\n")
 
-    page.click("#btnNext")
-    page.wait_for_timeout(2000)
+    old = page.url
+    try:
+        page.wait_for_url(lambda u: u != old, timeout=0)
+    except PlaywrightTimeoutError:
+        return
+    wait_page_ready(page)
+    log("Complaint submitted successfully.")
 
 
 def submit_claim_with_playwright(parsed: dict):
@@ -465,7 +499,12 @@ def submit_claim_with_playwright(parsed: dict):
     )
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(headless=HEADLESS_MODE)
+        # The final submission page contains a Google reCAPTCHA v2 that requires
+        # a human click, so the browser must always be visible for the operator.
+        # HEADLESS_MODE is intentionally ignored here.
+        if HEADLESS_MODE:
+            log("NOTE: HEADLESS_MODE overridden — browser must be visible for reCAPTCHA.")
+        browser = pw.chromium.launch(headless=False)
         page = browser.new_page()
 
         if TESTING_MODE:
@@ -478,6 +517,9 @@ def submit_claim_with_playwright(parsed: dict):
         wait_for_manual_next(page)
 
         fill_step1(page, parsed)
+        wait_for_manual_next(page)
+
+        fill_attestation(page)
         wait_for_manual_next(page)
 
         fill_step2(page, parsed)
@@ -496,11 +538,7 @@ def submit_claim_with_playwright(parsed: dict):
         wait_for_manual_next(page)
 
         fill_step7(page, parsed)
-
-        if not TESTING_MODE:
-            browser.close()
-        else:
-            print("[TESTING MODE] Browser left open for manual review.")
+        browser.close()
 
 
 # ---------------------------------------------------------------

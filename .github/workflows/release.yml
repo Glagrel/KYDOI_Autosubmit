@@ -1,0 +1,100 @@
+name: Release on Version Bump
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'ky_doi_autosubmit.py'
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+      version-changed: ${{ steps.check-version.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from script
+        id: get-version
+        run: |
+          VERSION=$(grep -oP 'CURRENT_VERSION = "\K[^"]+' ky_doi_autosubmit.py)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Found version: $VERSION"
+
+      - name: Check if version changed
+        id: check-version
+        run: |
+          SCRIPT_VERSION=$(grep -oP 'CURRENT_VERSION = "\K[^"]+' ky_doi_autosubmit.py)
+          JSON_VERSION=$(grep -oP '"version": "\K[^"]+' version.json)
+          if [ "$SCRIPT_VERSION" != "$JSON_VERSION" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Version changed from $JSON_VERSION to $SCRIPT_VERSION"
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "No version change detected"
+          fi
+
+  build-and-release:
+    needs: check-version
+    if: needs.check-version.outputs.version-changed == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Build installer with NSIS
+        run: |
+          $nsis_path = "C:\Program Files (x86)\NSIS\makensis.exe"
+          & $nsis_path installer.nsi
+          if (-not (Test-Path "KY_DOI_Installer.exe")) {
+            throw "NSIS build failed!"
+          }
+        shell: powershell
+
+      - name: Create Release
+        id: create-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          gh release create "v$VERSION" KY_DOI_Installer.exe `
+            --title "KY DOI PBM Auto Submitter v$VERSION" `
+            --generate-notes
+          echo "release-url=https://github.com/Glagrel/KYDOI_Autosubmit/releases/download/v$VERSION/KY_DOI_Installer.exe" >> $GITHUB_OUTPUT
+        shell: powershell
+
+      - name: Update version.json
+        run: |
+          $VERSION = "${{ needs.check-version.outputs.version }}"
+          $DOWNLOAD_URL = "${{ steps.create-release.outputs.release-url }}"
+          $versionJson = @{
+              version = $VERSION
+              download_url = $DOWNLOAD_URL
+              notes = "Release v$VERSION"
+          }
+          $versionJson | ConvertTo-Json | Set-Content version.json
+          Get-Content version.json
+        shell: powershell
+
+      - name: Commit and push version.json
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          git add version.json
+          git commit -m "chore: update version.json to v${{ needs.check-version.outputs.version }}" || echo "No changes to commit"
+          git push
+        shell: powershell
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KY_DOI_Installer
+          path: KY_DOI_Installer.exe

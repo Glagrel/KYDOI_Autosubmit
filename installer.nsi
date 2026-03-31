@@ -1,8 +1,22 @@
 !include "MUI2.nsh"
 
-Name "KY DOI PBM Auto Submitter"
+; ---------------------------------------------------------------
+; VERSION — keep in sync with CURRENT_VERSION in ky_doi_autosubmit.py
+; ---------------------------------------------------------------
+!define VERSION "17.0"
+!define PRODUCT_NAME "KY DOI PBM Auto Submitter"
+
+Name "${PRODUCT_NAME} v${VERSION}"
 OutFile "KY_DOI_Installer.exe"
 InstallDir "C:\KY_DOI"
+
+; Embed version metadata in the .exe (visible in Properties → Details)
+VIProductVersion "${VERSION}.0.0"
+VIAddVersionKey "ProductName"     "${PRODUCT_NAME}"
+VIAddVersionKey "FileVersion"     "${VERSION}"
+VIAddVersionKey "ProductVersion"  "${VERSION}"
+VIAddVersionKey "LegalCopyright"  ""
+VIAddVersionKey "FileDescription" "KY DOI PBM Auto Submitter Installer"
 
 RequestExecutionLevel admin
 
