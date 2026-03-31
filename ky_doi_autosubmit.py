@@ -1,8 +1,13 @@
 # ===============================================================
-#  KY DOI PBM Complaint Auto-Submitter — SCRIPT v18
+#  KY DOI PBM Complaint Auto-Submitter — SCRIPT v18.1
 #  Windows 11
 #
-#  CHANGES IN v18:
+#  CHANGES IN v18.1:
+#    • FEATURE: When HEADLESS_MODE is on (and TESTING_MODE is off),
+#      steps 0-6 now run invisibly. Browser switches to visible only
+#      for the reCAPTCHA/signature step so operator can complete it.
+#
+#  CHANGES IN v18 (still present):
 #    • FIX: Auto-updater now reliably resolves download URL via
 #      GitHub Actions CI (release workflow fixed)
 #
@@ -49,7 +54,7 @@ import requests, urllib.request, os, sys, subprocess, ctypes
 # VERSION / UPDATER CONFIG
 # ---------------------------------------------------------------
 VERSION_URL = "https://raw.githubusercontent.com/Glagrel/KYDOI_Autosubmit/main/version.json"
-CURRENT_VERSION = "18.0"
+CURRENT_VERSION = "18.1"
 INSTALLER_NAME = "KY_DOI_Installer.exe"
 
 
