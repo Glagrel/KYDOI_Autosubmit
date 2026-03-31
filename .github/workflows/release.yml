@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'ky_doi_autosubmit.py'
+  workflow_dispatch:
 
 jobs:
   check-version:
