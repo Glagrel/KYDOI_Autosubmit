@@ -49,38 +49,40 @@ jobs:
 
       - name: Install NSIS
         run: choco install nsis -y
+        shell: powershell
 
       - name: Build installer with NSIS
         run: |
           $nsis_path = "C:\Program Files (x86)\NSIS\makensis.exe"
           & $nsis_path installer.nsi
           if (-not (Test-Path "KY_DOI_Installer.exe")) {
-            throw "NSIS build failed!"
+            throw "NSIS build failed — KY_DOI_Installer.exe not found"
           }
+          Write-Host "Build succeeded"
         shell: powershell
 
-      - name: Create Release
+      - name: Create GitHub Release
         id: create-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ needs.check-version.outputs.version }}"
-          gh release create "v$VERSION" KY_DOI_Installer.exe `
-            --title "KY DOI PBM Auto Submitter v$VERSION" `
+          gh release create "v${VERSION}" KY_DOI_Installer.exe \
+            --title "KY DOI PBM Auto Submitter v${VERSION}" \
             --generate-notes
-          echo "release-url=https://github.com/Glagrel/KYDOI_Autosubmit/releases/download/v$VERSION/KY_DOI_Installer.exe" >> $GITHUB_OUTPUT
-        shell: powershell
+          echo "release-url=https://github.com/Glagrel/KYDOI_Autosubmit/releases/download/v${VERSION}/KY_DOI_Installer.exe" >> "$GITHUB_OUTPUT"
+        shell: bash
 
       - name: Update version.json
         run: |
           $VERSION = "${{ needs.check-version.outputs.version }}"
-          $DOWNLOAD_URL = "${{ steps.create-release.outputs.release-url }}"
-          $versionJson = @{
-              version = $VERSION
+          $DOWNLOAD_URL = "https://github.com/Glagrel/KYDOI_Autosubmit/releases/download/v$VERSION/KY_DOI_Installer.exe"
+          $versionJson = [ordered]@{
+              version      = $VERSION
               download_url = $DOWNLOAD_URL
-              notes = "Release v$VERSION"
+              notes        = "Release v$VERSION"
           }
-          $versionJson | ConvertTo-Json | Set-Content version.json
+          $versionJson | ConvertTo-Json | Set-Content version.json -Encoding UTF8
           Get-Content version.json
         shell: powershell
 
@@ -91,7 +93,7 @@ jobs:
           git add version.json
           git commit -m "chore: update version.json to v${{ needs.check-version.outputs.version }}" || echo "No changes to commit"
           git push
-        shell: powershell
+        shell: bash
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
